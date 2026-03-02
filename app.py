@@ -17,7 +17,7 @@ from src.llm import generate_report
 # ─── Page config ────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="SISE-OPSIE 2026 – Firewall Threat Analytics",
-    page_icon="🕶️",
+    page_icon="images/logo.png", 
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -317,8 +317,10 @@ def earth_globe_figure(points_src=None, points_dst=None, lines=None, dt_utc=None
 
 # ─── Sidebar – File loader ───────────────────────────────────────────────────
 with st.sidebar:
-    st.image("https://img.icons8.com/color/64/firewall.png", width=60)
-    st.title("🕶️ FW Console")
+
+    # ─── Page config ────────────────────────────────────────────────────────────
+    st.image("images/logo.png", width=250)
+    st.title("Firewall Threat Analytics")
     st.divider()
 
     uploaded = st.file_uploader("📂 Charger un fichier (Parquet / CSV)", type=["parquet", "csv"])
@@ -401,6 +403,19 @@ if df.empty:
 ALLOW = {"PERMIT", "ACCEPT", "ALLOW", "ALLOWED"}
 DENY  = {"DENY", "DROP", "REJECT", "BLOCK", "DENIED"}
 
+COLOR_ALLOW = "#00ff8c"   # vert néon
+COLOR_DENY  = "#ff3860"   # rouge
+ACTION_COLOR_MAP = {
+    "ALLOW": COLOR_ALLOW,
+    "PERMIT": COLOR_ALLOW,
+    "ACCEPT": COLOR_ALLOW,
+    "DENY": COLOR_DENY,
+    "DROP": COLOR_DENY,
+    "REJECT": COLOR_DENY,
+    "BLOCK": COLOR_DENY,
+    "DENIED": COLOR_DENY,
+}
+
 # ─── Tabs ─────────────────────────────────────────────────────────────────────
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📊 Overview", "📋 Rules & Ports", "🌐 IP Analysis", "🤖 ML / Anomalies", "📝 LLM Report"
@@ -445,7 +460,11 @@ with tab1:
         if "action" in df.columns:
             action_counts = df["action"].astype(str).str.upper().value_counts().reset_index()
             action_counts.columns = ["action", "count"]
-            fig = px.pie(action_counts, values="count", names="action", hole=0.4)
+            action_counts["action"] = action_counts["action"].astype(str).str.upper().str.strip()
+            fig = px.pie(
+                action_counts, values="count", names="action", hole=0.4,
+                color="action", color_discrete_map=ACTION_COLOR_MAP
+            )
             fig.update_layout(margin=dict(t=30, b=0, l=0, r=0), height=300)
             st.plotly_chart(fig, use_container_width=True)
 
@@ -461,15 +480,19 @@ with tab1:
             st.plotly_chart(fig2, use_container_width=True)
 
     with c3:
-        st.subheader(f"Top {top_n} règles utilisées")
+        st.subheader(f"Top {top_n} règles utilisées (table)")
         if "rule_id" in df.columns:
             rule_counts = df["rule_id"].value_counts().head(top_n).reset_index()
             rule_counts.columns = ["rule_id", "count"]
             rule_counts["rule_id"] = rule_counts["rule_id"].astype(str)
-            fig3 = px.bar(rule_counts, x="rule_id", y="count", text="count")
-            fig3.update_traces(texttemplate="%{text:,}", textposition="outside")
-            fig3.update_layout(xaxis_title="Rule ID", showlegend=False, margin=dict(t=10, b=0), height=300)
-            st.plotly_chart(fig3, use_container_width=True)
+
+            st.dataframe(
+                rule_counts,
+                use_container_width=True,
+                hide_index=True
+            )
+        else:
+            st.info("Colonne `rule_id` absente.")
 
     if "date" in df.columns and df["date"].notna().any():
         st.subheader("📈 Événements dans le temps (par heure)")
@@ -478,7 +501,11 @@ with tab1:
         df_time = df_time.dropna(subset=["date"])
         df_time["hour"] = df_time["date"].dt.floor("h")
         timeline = df_time.groupby(["hour", "action"]).size().reset_index(name="count")
-        fig_t = px.line(timeline, x="hour", y="count", color="action")
+        timeline["action"] = timeline["action"].astype(str).str.upper().str.strip()
+        fig_t = px.line(
+            timeline, x="hour", y="count", color="action",
+            color_discrete_map=ACTION_COLOR_MAP
+        )
         fig_t.update_layout(height=300, margin=dict(t=10))
         st.plotly_chart(fig_t, use_container_width=True)
 
@@ -494,17 +521,15 @@ with tab2:
     col_a, col_b = st.columns(2)
 
     with col_a:
-        st.subheader("Top 5 règles — TCP")
+        st.subheader("Top 5 règles — TCP (table)")
         if not df_tcp.empty and "rule_id" in df_tcp.columns:
             top_tcp = df_tcp["rule_id"].value_counts().head(5).reset_index()
             top_tcp.columns = ["rule_id", "count"]
-            fig_tcp = px.bar(top_tcp, x="count", y=top_tcp["rule_id"].astype(str), orientation="h", text="count")
-            fig_tcp.update_traces(texttemplate="%{text:,}")
-            fig_tcp.update_layout(yaxis_title="Rule ID", height=280, margin=dict(t=10))
-            st.plotly_chart(fig_tcp, use_container_width=True)
+            top_tcp["rule_id"] = top_tcp["rule_id"].astype(str)
+
             st.dataframe(top_tcp, use_container_width=True, hide_index=True)
         else:
-            st.info("Pas de trafic TCP (ou rule_id absent).")
+            st.info("Pas de trafic TCP (ou `rule_id` absent).")
 
     with col_b:
         st.subheader("Top 10 règles — UDP")
@@ -576,19 +601,21 @@ with tab3:
         st.plotly_chart(fig_top5, use_container_width=True)
 
     with sc2:
-        st.subheader("🔓 Top 10 ports <1024 autorisés (ALLOW)")
+        st.subheader("🔓 Top 10 ports <1024 autorisés (ALLOW) — table")
         if {"dst_port", "action"}.issubset(df.columns):
-            allow_mask = df["action"].astype(str).str.upper().isin(ALLOW)
+            allow_mask = df["action"].astype(str).str.upper().str.strip().isin(ALLOW)
             priv_allow = df[(df["dst_port"] < 1024) & allow_mask]
+
             if not priv_allow.empty:
                 top_priv = priv_allow["dst_port"].value_counts().head(10).reset_index()
                 top_priv.columns = ["dst_port", "count"]
-                fig_priv = px.bar(top_priv, x="dst_port", y="count", text="count")
-                fig_priv.update_traces(texttemplate="%{text:,}", textposition="outside")
-                fig_priv.update_layout(height=250, margin=dict(t=10), xaxis_title="Port")
-                st.plotly_chart(fig_priv, use_container_width=True)
+                top_priv["dst_port"] = top_priv["dst_port"].astype(int)
+
+                st.dataframe(top_priv, use_container_width=True, hide_index=True)
             else:
                 st.info("Aucun accès ALLOW vers ports <1024.")
+        else:
+            st.info("Colonnes `dst_port` / `action` absentes.")
 
     st.subheader(f"🚨 IP sources hors plan d'adressage (ne commençant pas par `{network_plan}`)")
     if network_plan and "ip_src" in df.columns:
@@ -633,50 +660,97 @@ with tab3:
     st.divider()
     st.subheader("🗺️ Carte géographique — Origine des connexions (GeoIP ip-api)")
 
-    geo_mode = st.radio("Géolocalisation", ["Sources (ip_src)", "Destinations (ip_dst)", "Les deux"], horizontal=True)
+    geo_mode = st.radio(
+        "Géolocalisation",
+        ["Sources (ip_src)", "Destinations (ip_dst)", "Les deux"],
+        horizontal=True,
+    )
     max_geo = st.slider("Limiter le nombre d'IP géolocalisées (perf)", 20, 500, 200, step=10)
 
-    df_geo = df.copy()
-    if geo_mode in ["Sources (ip_src)", "Les deux"] and "ip_src" in df_geo.columns:
-        df_geo = enrich_geo(df_geo, "ip_src", max_ips=max_geo).rename(columns={"lat": "src_lat", "lon": "src_lon"})
-    if geo_mode in ["Destinations (ip_dst)", "Les deux"] and "ip_dst" in df_geo.columns:
-        df_geo = enrich_geo(df_geo, "ip_dst", max_ips=max_geo).rename(columns={"lat": "dst_lat", "lon": "dst_lon"})
+    # ── 1) Construire des tables AGRÉGÉES (petites) au lieu de merge sur df complet ──
+    src_points = None
+    dst_points = None
 
+    if geo_mode in ["Sources (ip_src)", "Les deux"] and "ip_src" in df.columns:
+        src_points = (
+            df["ip_src"].dropna().astype(str)
+            .value_counts()
+            .head(max_geo)
+            .reset_index()
+        )
+        src_points.columns = ["ip_src", "count"]
+        src_points = enrich_geo(src_points, "ip_src", max_ips=max_geo).rename(
+            columns={"lat": "src_lat", "lon": "src_lon"}
+        )
+
+    if geo_mode in ["Destinations (ip_dst)", "Les deux"] and "ip_dst" in df.columns:
+        dst_points = (
+            df["ip_dst"].dropna().astype(str)
+            .value_counts()
+            .head(max_geo)
+            .reset_index()
+        )
+        dst_points.columns = ["ip_dst", "count"]
+        dst_points = enrich_geo(dst_points, "ip_dst", max_ips=max_geo).rename(
+            columns={"lat": "dst_lat", "lon": "dst_lon"}
+        )
+
+    # ── 2) Affichage carte ──
     fig_map = go.Figure()
 
-    if {"src_lat", "src_lon", "ip_src"}.issubset(df_geo.columns) and df_geo["src_lat"].notna().any():
-        src_points = (df_geo.dropna(subset=["src_lat", "src_lon"]).groupby(["ip_src", "src_lat", "src_lon"]).size()
-                      .reset_index(name="count").sort_values("count", ascending=False).head(300))
+    # Points sources
+    if src_points is not None and {"src_lat", "src_lon"}.issubset(src_points.columns) and src_points["src_lat"].notna().any():
+        sp = src_points.dropna(subset=["src_lat", "src_lon"]).head(300)
         fig_map.add_trace(go.Scattergeo(
-            lat=src_points["src_lat"], lon=src_points["src_lon"],
-            mode="markers", marker=dict(size=6),
-            text=src_points["ip_src"] + " (" + src_points["count"].astype(str) + ")",
+            lat=sp["src_lat"],
+            lon=sp["src_lon"],
+            mode="markers",
+            marker=dict(size=7),
+            text=sp["ip_src"].astype(str) + " (" + sp["count"].astype(str) + ")",
             name="Sources"
         ))
 
-    if {"dst_lat", "dst_lon", "ip_dst"}.issubset(df_geo.columns) and df_geo["dst_lat"].notna().any():
-        dst_points = (df_geo.dropna(subset=["dst_lat", "dst_lon"]).groupby(["ip_dst", "dst_lat", "dst_lon"]).size()
-                      .reset_index(name="count").sort_values("count", ascending=False).head(80))
+    # Points destinations
+    if dst_points is not None and {"dst_lat", "dst_lon"}.issubset(dst_points.columns) and dst_points["dst_lat"].notna().any():
+        dp = dst_points.dropna(subset=["dst_lat", "dst_lon"]).head(200)
         fig_map.add_trace(go.Scattergeo(
-            lat=dst_points["dst_lat"], lon=dst_points["dst_lon"],
-            mode="markers", marker=dict(size=8),
-            text=dst_points["ip_dst"] + " (" + dst_points["count"].astype(str) + ")",
+            lat=dp["dst_lat"],
+            lon=dp["dst_lon"],
+            mode="markers",
+            marker=dict(size=9),
+            text=dp["ip_dst"].astype(str) + " (" + dp["count"].astype(str) + ")",
             name="Destinations"
         ))
 
-    if {"src_lat", "src_lon", "dst_lat", "dst_lon", "action", "ip_src", "ip_dst"}.issubset(df_geo.columns):
-        pairs = (df_geo.dropna(subset=["src_lat", "src_lon", "dst_lat", "dst_lon"])
-                 .groupby(["ip_src", "ip_dst", "src_lat", "src_lon", "dst_lat", "dst_lon", "action"]).size()
-                 .reset_index(name="count").sort_values("count", ascending=False).head(150))
-        for _, r in pairs.iterrows():
-            ok = str(r["action"]).upper() in ALLOW
-            line_color = "rgba(0,255,140,0.35)" if ok else "rgba(255,56,96,0.35)"
-            fig_map.add_trace(go.Scattergeo(
-                lat=[r["src_lat"], r["dst_lat"]],
-                lon=[r["src_lon"], r["dst_lon"]],
-                mode="lines", line=dict(width=1.5, color=line_color),
-                opacity=0.5, showlegend=False
-            ))
+    # ── 3) Lignes src -> dst (uniquement si "Les deux") ──
+    if geo_mode == "Les deux" and src_points is not None and dst_points is not None:
+        if {"ip_src", "ip_dst", "action"}.issubset(df.columns):
+            pairs = (
+                df.groupby(["ip_src", "ip_dst", "action"])
+                .size()
+                .reset_index(name="count")
+                .sort_values("count", ascending=False)
+                .head(150)
+            )
+
+            pairs["ip_src"] = pairs["ip_src"].astype(str)
+            pairs["ip_dst"] = pairs["ip_dst"].astype(str)
+
+            pairs = pairs.merge(src_points[["ip_src", "src_lat", "src_lon"]], on="ip_src", how="left")
+            pairs = pairs.merge(dst_points[["ip_dst", "dst_lat", "dst_lon"]], on="ip_dst", how="left")
+            pairs = pairs.dropna(subset=["src_lat", "src_lon", "dst_lat", "dst_lon"])
+
+            for _, r in pairs.iterrows():
+                ok = str(r["action"]).upper() in ALLOW
+                line_color = "rgba(0,255,140,0.35)" if ok else "rgba(255,56,96,0.35)"
+                fig_map.add_trace(go.Scattergeo(
+                    lat=[r["src_lat"], r["dst_lat"]],
+                    lon=[r["src_lon"], r["dst_lon"]],
+                    mode="lines",
+                    line=dict(width=1.5, color=line_color),
+                    opacity=0.6,
+                    showlegend=False,
+                ))
 
     fig_map.update_layout(
         height=650,
