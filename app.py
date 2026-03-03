@@ -16,7 +16,7 @@ from src.llm import generate_report
 
 # ─── Page config ────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="SISE-OPSIE 2026 – Firewall Threat Analytics",
+    page_title="Challenge SISE-OPSIE 2026 – Analyse des menaces firewall",
     page_icon="images/logo.png", 
     layout="wide",
     initial_sidebar_state="expanded",
@@ -135,10 +135,7 @@ st.markdown("""
             border-radius:14px;padding:18px;margin-bottom:14px;
             box-shadow:0 0 22px rgba(0,255,140,0.10);">
   <div style="font-size:22px;color:#00ff8c;font-weight:800;">
-    SISE-OPSIE 2026 — Firewall Threat Analytics
-  </div>
-  <div style="color:rgba(215,255,233,0.75);margin-top:6px;">
-    Visualisation • Rules/Ports • IP Threats • ML Anomalies • LLM Analyst
+    Challenge SISE-OPSIE 2026 — Analyse des menaces firewall
   </div>
 </div>
 """, unsafe_allow_html=True)
@@ -319,11 +316,8 @@ def earth_globe_figure(points_src=None, points_dst=None, lines=None, dt_utc=None
 with st.sidebar:
 
     # ─── Page config ────────────────────────────────────────────────────────────
-    st.image("images/logo.png", width=250)
-    st.title("Firewall Threat Analytics")
-    st.divider()
 
-    uploaded = st.file_uploader("📂 Charger un fichier (Parquet / CSV)", type=["parquet", "csv"])
+    uploaded = st.file_uploader("Charger un fichier (Parquet / CSV)", type=["parquet", "csv"])
     data_path = None
 
     if uploaded:
@@ -357,35 +351,35 @@ df_raw = cached_load(data_path)
 
 # ─── Sidebar – Filters ───────────────────────────────────────────────────────
 with st.sidebar:
-    st.subheader("🎛️ Filtres globaux")
+    st.subheader(" Filtres globaux")
 
     if "date" in df_raw.columns and df_raw["date"].notna().any():
         dmin = pd.to_datetime(df_raw["date"], errors="coerce").min().date()
         dmax = pd.to_datetime(df_raw["date"], errors="coerce").max().date()
-        date_range = st.date_input("📅 Plage de dates", value=(dmin, dmax), min_value=dmin, max_value=dmax)
+        date_range = st.date_input("Plage de dates", value=(dmin, dmax), min_value=dmin, max_value=dmax)
         filters_date = date_range if len(date_range) == 2 else (dmin, dmax)
     else:
         filters_date = None
 
     protocols_avail = sorted(df_raw["protocol"].dropna().unique().tolist()) if "protocol" in df_raw.columns else []
-    sel_protocols = st.multiselect("🌐 Protocoles", protocols_avail, default=protocols_avail)
+    sel_protocols = st.multiselect("Protocoles", protocols_avail, default=protocols_avail)
 
     actions_avail = sorted(df_raw["action"].dropna().unique().tolist()) if "action" in df_raw.columns else []
-    sel_actions = st.multiselect("⚡ Actions", actions_avail, default=actions_avail)
+    sel_actions = st.multiselect("Actions", actions_avail, default=actions_avail)
 
-    st.markdown("**🔌 Plage de ports (dst)**")
+    st.markdown("**Plage de ports (dst)**")
     port_lo, port_hi = st.slider("", 0, 65535, (0, 65535), step=1)
 
     if "rule_id" in df_raw.columns:
         rule_ids_avail = sorted(df_raw["rule_id"].dropna().unique().astype(int).tolist())
-        sel_rules = st.multiselect("📋 Rule IDs", rule_ids_avail, default=rule_ids_avail)
+        sel_rules = st.multiselect("Rule IDs", rule_ids_avail, default=rule_ids_avail)
     else:
         sel_rules = []
 
-    top_n = st.slider("🏆 Top N", 5, 50, 10)
+    top_n = st.slider("Top N", 5, 50, 10)
 
     st.divider()
-    network_plan = st.text_input("🏢 Plan d'adressage (préfixe)", value="159.84.")
+    network_plan = st.text_input("Plan d'adressage (préfixe)", value="159.84.")
 
 filters = {
     "date_range": filters_date,
@@ -397,7 +391,7 @@ filters = {
 
 df = apply_filters(df_raw, filters)
 if df.empty:
-    st.error("❌ Aucune donnée après filtrage. Ajustez les filtres.")
+    st.error("Aucune donnée après filtrage. Ajustez les filtres.")
     st.stop()
 
 # Normalisation actions
@@ -419,14 +413,14 @@ ACTION_COLOR_MAP = {
 
 # ─── Tabs ─────────────────────────────────────────────────────────────────────
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "📊 Overview", "📋 Rules & Ports", "🌐 IP Analysis", "🤖 ML / Anomalies", "📝 LLM Report"
+    "Vue d'ensemble", "Règles & Ports", "Analyse des IP", "ML / Anomalies", "Rapport IA"
 ])
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB 1 – OVERVIEW
 # ═══════════════════════════════════════════════════════════════════════════════
 with tab1:
-    st.header("📊 Vue d'ensemble des événements")
+    st.header("Vue d'ensemble des événements")
 
     n_events = len(df)
     n_src = df["ip_src"].nunique() if "ip_src" in df.columns else 0
@@ -485,7 +479,7 @@ with tab1:
         if "rule_id" in df.columns:
             rule_counts = df["rule_id"].value_counts().head(top_n).reset_index()
             rule_counts.columns = ["rule_id", "count"]
-            rule_counts["rule_id"] = rule_counts["rule_id"].astype(str)
+            rule_counts["rule_id"] = rule_counts["rule_id"].astype(int)
 
             st.dataframe(
                 rule_counts,
@@ -496,7 +490,7 @@ with tab1:
             st.info("Colonne `rule_id` absente.")
 
     if "date" in df.columns and df["date"].notna().any():
-        st.subheader("📈 Événements dans le temps (par heure)")
+        st.subheader("Événements dans le temps (par heure)")
         df_time = df.copy()
         df_time["date"] = pd.to_datetime(df_time["date"], errors="coerce")
         df_time = df_time.dropna(subset=["date"])
@@ -514,7 +508,7 @@ with tab1:
 # TAB 2 – RULES & PORTS
 # ═══════════════════════════════════════════════════════════════════════════════
 with tab2:
-    st.header("📋 Analyse des règles & ports")
+    st.header("Analyse des règles & ports")
 
     df_tcp = df[df["protocol"].astype(str).str.upper() == "TCP"] if "protocol" in df.columns else df.iloc[0:0]
     df_udp = df[df["protocol"].astype(str).str.upper() == "UDP"] if "protocol" in df.columns else df.iloc[0:0]
@@ -526,7 +520,7 @@ with tab2:
         if not df_tcp.empty and "rule_id" in df_tcp.columns:
             top_tcp = df_tcp["rule_id"].value_counts().head(5).reset_index()
             top_tcp.columns = ["rule_id", "count"]
-            top_tcp["rule_id"] = top_tcp["rule_id"].astype(str)
+            top_tcp["rule_id"] = top_tcp["rule_id"].astype(int)
 
             st.dataframe(top_tcp, use_container_width=True, hide_index=True)
         else:
@@ -546,7 +540,7 @@ with tab2:
             st.info("Pas de trafic UDP (ou rule_id absent).")
 
     st.divider()
-    st.subheader("🔀 TCP — Rule ID → Port DST → Action (Sankey)")
+    st.subheader("TCP — Rule ID → Port DST → Action (Sankey)")
 
     sankey_k = st.slider("Nombre de flux top K", 10, 100, 30, key="sankey_k")
     threshold = st.number_input("Seuil minimal de count", min_value=1, value=10, step=1, key="sankey_thresh")
@@ -588,12 +582,12 @@ with tab2:
 # TAB 3 – IP ANALYSIS
 # ═══════════════════════════════════════════════════════════════════════════════
 with tab3:
-    st.header("🌐 Analyse des IP sources")
+    st.header("Analyse des IP sources")
 
     sc1, sc2 = st.columns(2)
 
     with sc1:
-        st.subheader("🏆 Top 5 IP sources")
+        st.subheader("Top 5 IP sources")
         top5_src = df["ip_src"].value_counts().head(5).reset_index()
         top5_src.columns = ["ip_src", "events"]
         fig_top5 = px.bar(top5_src, x="events", y="ip_src", orientation="h", text="events")
@@ -602,7 +596,7 @@ with tab3:
         st.plotly_chart(fig_top5, use_container_width=True)
 
     with sc2:
-        st.subheader("🔓 Top 10 ports <1024 autorisés (ALLOW) — table")
+        st.subheader("Top 10 ports <1024 autorisés (ALLOW) — table")
         if {"dst_port", "action"}.issubset(df.columns):
             allow_mask = df["action"].astype(str).str.upper().str.strip().isin(ALLOW)
             priv_allow = df[(df["dst_port"] < 1024) & allow_mask]
@@ -618,7 +612,7 @@ with tab3:
         else:
             st.info("Colonnes `dst_port` / `action` absentes.")
 
-    st.subheader(f"🚨 IP sources hors plan d'adressage (ne commençant pas par `{network_plan}`)")
+    st.subheader(f"IP sources hors plan d'adressage (ne commençant pas par `{network_plan}`)")
     if network_plan and "ip_src" in df.columns:
         out_plan = df[~df["ip_src"].astype(str).str.startswith(network_plan)]
         st.caption(f"{out_plan['ip_src'].nunique():,} IP(s) hors plan sur {df['ip_src'].nunique():,} total")
@@ -634,7 +628,7 @@ with tab3:
 
         st.dataframe(out_summary.head(50), use_container_width=True, hide_index=True)
 
-        st.markdown("### 🧠 Analyse IA — Triage des IP hors plan")
+        st.markdown("### Analyse IA — Triage des IP hors plan")
         top_out = out_summary.head(20).copy()
 
         out_events = out_plan[out_plan["ip_src"].isin(top_out["ip_src"])].copy()
@@ -649,7 +643,7 @@ with tab3:
                 "action_counts": (ip_e["action"].astype(str).str.upper().value_counts().to_dict() if "action" in ip_e.columns else {}),
             })
 
-        if st.button("🧠 Générer triage IA (hors plan)", key="llm_outplan"):
+        if st.button("Générer triage IA (hors plan)", key="llm_outplan"):
             with st.spinner("Génération IA..."):
                 report = generate_report(
                     ip="OUT_OF_PLAN",
@@ -659,7 +653,7 @@ with tab3:
             st.markdown(report)
 
     st.divider()
-    st.subheader("🗺️ Carte géographique — Origine des connexions (GeoIP ip-api)")
+    st.subheader("Carte géographique — Origine des connexions (GeoIP ip-api)")
 
     geo_mode = st.radio(
         "Géolocalisation",
@@ -776,12 +770,12 @@ with tab3:
 # TAB 4 – ML ANOMALIES
 # ═══════════════════════════════════════════════════════════════════════════════
 with tab4:
-    st.header("🤖 Détection d'anomalies — IsolationForest")
+    st.header("Détection d'anomalies — IsolationForest")
 
     col_ml1, col_ml2 = st.columns([1, 3])
     with col_ml1:
         contamination = st.slider("Contamination (% anomalies attendues)", 0.001, 0.20, 0.02, step=0.001, format="%.3f")
-        run_ml = st.button("🚀 Lancer la détection", type="primary")
+        run_ml = st.button("Lancer la détection", type="primary")
 
     if run_ml or "ml_results" in st.session_state:
         if run_ml:
@@ -792,17 +786,17 @@ with tab4:
 
         results = st.session_state["ml_results"]
         anomalies = results[results["is_anomaly"]].sort_values("anomaly_score_raw")
-        st.success(f"✅ {len(anomalies)} anomalies détectées sur {len(results)} IP analysées")
+        st.success(f"{len(anomalies)} anomalies détectées sur {len(results)} IP analysées")
 
         col_s1, col_s2 = st.columns(2)
         with col_s1:
-            st.subheader("🚨 Top 20 IP suspectes")
+            st.subheader("Top 20 IP suspectes")
             display_cols = ["ip_src", "events", "uniq_dst", "uniq_ports", "priv_port_ratio", "max_events_per_min", "anomaly_score_raw"]
             avail_cols = [c for c in display_cols if c in anomalies.columns]
             st.dataframe(anomalies[avail_cols].head(20), use_container_width=True, hide_index=True)
 
         with col_s2:
-            st.subheader("📊 Score d'anomalie vs événements")
+            st.subheader("Score d'anomalie vs événements")
             fig_ml = px.scatter(
                 results.head(500), x="events", y="anomaly_score_raw",
                 color="is_anomaly",
@@ -813,7 +807,7 @@ with tab4:
             fig_ml.update_layout(height=400, margin=dict(t=10))
             st.plotly_chart(fig_ml, use_container_width=True)
 
-        st.subheader("🔬 Exploration des features")
+        st.subheader("Exploration des features")
         feat_cols = ["events", "uniq_dst", "uniq_ports", "tcp_ratio", "priv_port_ratio", "max_events_per_min"]
         avail_feat_cols = [c for c in feat_cols if c in results.columns]
         fig_parallel = px.parallel_coordinates(
@@ -827,7 +821,7 @@ with tab4:
 
         if not anomalies.empty:
             st.divider()
-            st.subheader("🔎 Détail d'une IP suspecte — Globe + Timeline + IA")
+            st.subheader("Détail d'une IP suspecte — Globe + Timeline + IA")
 
             sel_suspect = st.selectbox("Choisir une IP suspecte", anomalies["ip_src"].head(50).astype(str).tolist(), key="ml_ip")
             sus_df = df[df["ip_src"].astype(str) == str(sel_suspect)].copy()
@@ -846,7 +840,7 @@ with tab4:
                 hours = np.sort(hours) if len(hours) else np.array([])
 
                 if len(hours):
-                    idx = st.slider("⏱️ Heure (défilement)", 0, int(len(hours)-1), int(len(hours)-1))
+                    idx = st.slider("Heure (défilement)", 0, int(len(hours)-1), int(len(hours)-1))
                     t_sel = pd.Timestamp(hours[idx])
                 else:
                     t_sel = None
@@ -854,27 +848,27 @@ with tab4:
                 left, right = st.columns([1.35, 1.0], vertical_alignment="top")
 
                 with right:
-                    st.markdown("### ⌛ Timeline")
+                    st.markdown("### Timeline")
                     if "date" in sus_df.columns and sus_df["date"].notna().any():
                         tl = sus_df.groupby(["hour", "action"]).size().reset_index(name="count")
                         fig_tl = px.line(tl, x="hour", y="count", color="action")
                         fig_tl.update_layout(height=250, margin=dict(t=10))
                         st.plotly_chart(fig_tl, use_container_width=True)
 
-                    st.markdown("### 🗓️ Contexte calendrier (France)")
+                    st.markdown("### Contexte calendrier (France)")
                     if t_sel is not None:
                         holiday = is_holiday_fr(t_sel)
                         st.write(f"**Heure sélectionnée (UTC)** : `{t_sel}`")
-                        st.write(f"**Jour férié / week-end ?** : {'✅ OUI' if holiday else '❌ NON'}")
+                        st.write(f"**Jour férié / week-end ?** : {' OUI' if holiday else 'NON'}")
                     else:
                         st.write("Pas de date exploitable.")
 
-                    st.markdown("### 🧾 Derniers événements")
+                    st.markdown("### Derniers événements")
                     cols = [c for c in ["date", "ip_src", "ip_dst", "protocol", "dst_port", "rule_id", "action"] if c in sus_df.columns]
                     st.dataframe(sus_df.sort_values("date", ascending=False)[cols].head(25), use_container_width=True, hide_index=True)
 
                 with left:
-                    st.markdown("### 🌍 Globe tactique (terminator jour/nuit)")
+                    st.markdown("### Globe tactique (terminator jour/nuit)")
                     slice_df = sus_df[sus_df["hour"] == t_sel].copy() if t_sel is not None else sus_df.copy()
 
                     slice_geo = slice_df.copy()
@@ -921,7 +915,7 @@ with tab4:
                     st.caption("Le trait cyan (approx) représente le terminator (jour/nuit) selon l'heure UTC.")
 
                 st.divider()
-                st.subheader("🧠 IA — Hypothèse de politique firewall (défensif)")
+                st.subheader("IA — Hypothèse de politique firewall (défensif)")
 
                 summary = {
                     "mode": "policy_inference",
@@ -937,30 +931,30 @@ with tab4:
                 example_cols = [c for c in ["date", "ip_src", "ip_dst", "protocol", "src_port", "dst_port", "rule_id", "action"] if c in sus_df.columns]
                 examples = sus_df.sort_values("date", ascending=False)[example_cols].head(40).astype(str).to_dict(orient="records")
 
-                if st.button("🧠 Générer analyse IA (politique observée)", key="llm_policy"):
+                if st.button("Générer analyse IA (politique observée)", key="llm_policy"):
                     with st.spinner("Génération IA..."):
                         report = generate_report(str(sel_suspect), stats=summary, examples=examples)
                     st.markdown(report)
 
     else:
-        st.info("👆 Cliquez sur **Lancer la détection** pour exécuter IsolationForest sur les données filtrées.")
+        st.info("Cliquez sur **Lancer la détection** pour exécuter IsolationForest sur les données filtrées.")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB 5 – LLM REPORT
 # ═══════════════════════════════════════════════════════════════════════════════
 with tab5:
-    st.header("📝 Rapport d'incident (LLM / Template)")
+    st.header("Rapport d'incident (LLM / Template)")
 
     mistral_key = os.environ.get("MISTRAL_API_KEY", "").strip()
     if mistral_key:
-        st.success("✅ Clé Mistral détectée — mode IA activé (`mistral-small-latest`)")
+        st.success("Clé Mistral détectée — mode IA activé (`mistral-small-latest`)")
     else:
-        st.info("ℹ️ Pas de clé Mistral (`MISTRAL_API_KEY`) — mode template offline activé")
+        st.info("Pas de clé Mistral (`MISTRAL_API_KEY`) — mode template offline activé")
 
     ip_list = df["ip_src"].value_counts().head(100).index.astype(str).tolist() if "ip_src" in df.columns else []
     report_ip = st.selectbox("Sélectionner une IP à analyser", ip_list, key="report_ip")
 
-    if st.button("📄 Générer le rapport", type="primary"):
+    if st.button("Générer le rapport", type="primary"):
         with st.spinner("Génération du rapport..."):
             ip_df = df[df["ip_src"].astype(str) == str(report_ip)].copy()
 
